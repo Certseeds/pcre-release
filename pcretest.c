@@ -893,6 +893,7 @@ while (!done)
     {
     unsigned char *q;
     unsigned char *bptr = dbuffer;
+    int *use_offsets = offsets;
     int use_size_offsets = size_offsets;
     int count, c;
     int copystrings = 0;
@@ -1010,9 +1011,9 @@ while (!done)
         while(isdigit(*p)) n = n * 10 + *p++ - '0';
         if (n > size_offsets_max)
           {
-          free(offsets);
           size_offsets_max = n;
-          offsets = malloc(size_offsets_max * sizeof(int));
+          free(offsets);
+          use_offsets = offsets = malloc(size_offsets_max * sizeof(int));
           if (offsets == NULL)
             {
             printf("** Failed to get %d bytes of memory for offsets vector\n",
@@ -1021,6 +1022,7 @@ while (!done)
             }
           }
         use_size_offsets = n;
+        if (n == 0) use_offsets = NULL;
         continue;
 
         case 'Z':
@@ -1088,7 +1090,7 @@ while (!done)
         clock_t start_time = clock();
         for (i = 0; i < LOOPREPEAT; i++)
           count = pcre_exec(re, extra, (char *)bptr, len,
-            start_offset, options | g_notempty, offsets, use_size_offsets);
+            start_offset, options | g_notempty, use_offsets, use_size_offsets);
         time_taken = clock() - start_time;
         fprintf(outfile, "Execute time %.3f milliseconds\n",
           ((double)time_taken * 1000.0)/
@@ -1096,7 +1098,7 @@ while (!done)
         }
 
       count = pcre_exec(re, extra, (char *)bptr, len,
-        start_offset, options | g_notempty, offsets, use_size_offsets);
+        start_offset, options | g_notempty, use_offsets, use_size_offsets);
 
       if (count == 0)
         {
@@ -1111,19 +1113,19 @@ while (!done)
         int i;
         for (i = 0; i < count * 2; i += 2)
           {
-          if (offsets[i] < 0)
+          if (use_offsets[i] < 0)
             fprintf(outfile, "%2d: <unset>\n", i/2);
           else
             {
             fprintf(outfile, "%2d: ", i/2);
-            pchars(bptr + offsets[i], offsets[i+1] - offsets[i], utf8);
+            pchars(bptr + use_offsets[i], use_offsets[i+1] - use_offsets[i], utf8);
             fprintf(outfile, "\n");
             if (i == 0)
               {
               if (do_showrest)
                 {
                 fprintf(outfile, " 0+ ");
-                pchars(bptr + offsets[i+1], len - offsets[i+1], utf8);
+                pchars(bptr + use_offsets[i+1], len - use_offsets[i+1], utf8);
                 fprintf(outfile, "\n");
                 }
               }
@@ -1135,7 +1137,7 @@ while (!done)
           if ((copystrings & (1 << i)) != 0)
             {
             char copybuffer[16];
-            int rc = pcre_copy_substring((char *)bptr, offsets, count,
+            int rc = pcre_copy_substring((char *)bptr, use_offsets, count,
               i, copybuffer, sizeof(copybuffer));
             if (rc < 0)
               fprintf(outfile, "copy substring %d failed %d\n", i, rc);
@@ -1149,7 +1151,7 @@ while (!done)
           if ((getstrings & (1 << i)) != 0)
             {
             const char *substring;
-            int rc = pcre_get_substring((char *)bptr, offsets, count,
+            int rc = pcre_get_substring((char *)bptr, use_offsets, count,
               i, &substring);
             if (rc < 0)
               fprintf(outfile, "get substring %d failed %d\n", i, rc);
@@ -1165,7 +1167,7 @@ while (!done)
         if (getlist)
           {
           const char **stringlist;
-          int rc = pcre_get_substring_list((char *)bptr, offsets, count,
+          int rc = pcre_get_substring_list((char *)bptr, use_offsets, count,
             &stringlist);
           if (rc < 0)
             fprintf(outfile, "get substring list failed %d\n", rc);
@@ -1191,8 +1193,8 @@ while (!done)
         {
         if (g_notempty != 0)
           {
-          offsets[0] = start_offset;
-          offsets[1] = start_offset + 1;
+          use_offsets[0] = start_offset;
+          use_offsets[1] = start_offset + 1;
           }
         else
           {
@@ -1217,22 +1219,22 @@ while (!done)
       character. */
 
       g_notempty = 0;
-      if (offsets[0] == offsets[1])
+      if (use_offsets[0] == use_offsets[1])
         {
-        if (offsets[0] == len) break;
+        if (use_offsets[0] == len) break;
         g_notempty = PCRE_NOTEMPTY | PCRE_ANCHORED;
         }
 
       /* For /g, update the start offset, leaving the rest alone */
 
-      if (do_g) start_offset = offsets[1];
+      if (do_g) start_offset = use_offsets[1];
 
       /* For /G, update the pointer and length */
 
       else
         {
-        bptr += offsets[1];
-        len -= offsets[1];
+        bptr += use_offsets[1];
+        len -= use_offsets[1];
         }
       }  /* End of loop for /g and /G */
     }    /* End of loop for data lines */

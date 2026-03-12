@@ -1,6 +1,24 @@
 ChangeLog for PCRE
 ------------------
 
+Version 3.7 29-Oct-01
+---------------------
+
+1. In updating pcretest to check change 1 of version 3.6, I screwed up.
+This caused pcretest, when used on the test data, to segfault. Unfortunately,
+this didn't happen under Solaris 8, where I normally test things.
+
+
+Version 3.6 23-Oct-01
+---------------------
+
+1. Crashed with /(sens|respons)e and \1ibility/ and "sense and sensibility" if
+offsets passed as NULL with zero offset count.
+
+2. The config.guess and config.sub files had not been updated when I moved to
+the latest autoconf.
+
+
 Version 3.5 15-Aug-01
 ---------------------
 
